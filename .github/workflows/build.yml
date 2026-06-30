@@ -86,8 +86,24 @@ jobs:
           STYLES_FILE="android/app/src/main/res/values/styles.xml"
           if [ -f "$STYLES_FILE" ]; then
             echo "Patching styles.xml to bind tools namespace..."
-            # If <resources> tag doesn't contain the tools namespace, add it
             sed -i 's/<resources>/<resources xmlns:tools="http:\/\/schemas.android.com\/tools">/g' "$STYLES_FILE"
+          fi
+
+      - name: Inject Missing Launcher Icons
+        run: |
+          MIPMAP_DIR="android/app/src/main/res/mipmap-mdpi"
+          mkdir -p "$MIPMAP_DIR"
+          
+          # If main launcher icon is missing, substitute a valid tiny placeholder asset
+          if [ ! -f "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml" ] && [ ! -f "$MIPMAP_DIR/ic_launcher.png" ]; then
+            echo "Launcher icon missing. Injecting dummy placeholder asset..."
+            echo -e '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FF000000" android:pathData="M12,2L2,22H22L12,2Z"/></vector>' > "$MIPMAP_DIR/ic_launcher.xml"
+          fi
+          
+          # If rounded icon target is required but missing, point it to matching asset base
+          if [ ! -f "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher_round.xml" ] && [ ! -f "$MIPMAP_DIR/ic_launcher_round.png" ]; then
+            echo "Round launcher icon missing. Copying fallback asset..."
+            cp "$MIPMAP_DIR/ic_launcher.xml" "$MIPMAP_DIR/ic_launcher_round.xml" 2>/dev/null || echo -e '<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="48dp" android:height="48dp" android:viewportWidth="24" android:viewportHeight="24"><path android:fillColor="#FF000000" android:pathData="M12,2L2,22H22L12,2Z"/></vector>' > "$MIPMAP_DIR/ic_launcher_round.xml"
           fi
 
       - name: Setup JDK 17
