@@ -10,7 +10,6 @@ jobs:
     - name: Unzip Source Code
       run: |
         unzip *.zip -d extracted_code
-        # Move everything up to the root level
         mv extracted_code/* . 2>/dev/null || true
         mv extracted_code/.* . 2>/dev/null || true
 
@@ -25,9 +24,10 @@ jobs:
       run: |
         npm install
 
-    - name: Build Web Assets
+    - name: Build Web Assets (Fixed Node Execution)
       run: |
-        npm run build
+        # Run the copy script forcing Node to treat it as a module, then build with vite
+        node --experimental-vm-modules scripts/copy-pdf-worker.js || node -e "require('fs').writeFileSync('package.json', JSON.stringify(Object.assign(JSON.parse(require('fs').readFileSync('package.json')), {type: 'module'}), null, 2))" && npm run build
 
     - name: set up JDK 17
       uses: actions/setup-java@v4
