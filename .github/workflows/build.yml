@@ -61,9 +61,18 @@ jobs:
         run: |
           # Create fallback directory at the root workspace level
           mkdir -p ${{ github.workspace }}/capacitor-cordova-android-plugins/src/main
-          if [ ! -f "${{ github.workspace }}/capacitor-cordova-android-plugins/build.gradle" ]; then
-            echo "apply plugin: 'com.android.library'" > ${{ github.workspace }}/capacitor-cordova-android-plugins/build.gradle
-          fi
+          
+          # Write a fully structured valid dummy build.gradle file with proper SDK configs
+          cat << 'EOF' > ${{ github.workspace }}/capacitor-cordova-android-plugins/build.gradle
+          apply plugin: 'com.android.library'
+          android {
+              compileSdkVersion 34
+              defaultConfig {
+                  minSdkVersion 22
+                  targetSdkVersion 34
+              }
+          }
+          EOF
           
           # Force set explicit path injection directly inside settings.gradle right after sync
           cd android
