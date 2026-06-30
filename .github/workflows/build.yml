@@ -62,10 +62,11 @@ jobs:
           # Create fallback directory at the root workspace level
           mkdir -p ${{ github.workspace }}/capacitor-cordova-android-plugins/src/main
           
-          # Write a fully structured valid dummy build.gradle file with proper SDK configs
+          # Write a fully structured valid dummy build.gradle file with namespace
           cat << 'EOF' > ${{ github.workspace }}/capacitor-cordova-android-plugins/build.gradle
           apply plugin: 'com.android.library'
           android {
+              namespace 'capacitor.cordova.android.plugins.fallback'
               compileSdkVersion 34
               defaultConfig {
                   minSdkVersion 22
