@@ -1,52 +1,95 @@
-name: Build Test APK
-on: [push, workflow_dispatch]
+name: Build Sparple APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Unzip Source Code
-      run: |
-        unzip *.zip -d extracted_code
-        mv extracted_code/* . 2>/dev/null || true
-        mv extracted_code/.* . 2>/dev/null || true
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: 18
-        cache: 'npm'
-        cache-dependency-path: package.json
+      - name: Unzip any source archives if present
+        run: |
+          shopt -s nullglob
+          zips=(*.zip)
+          if [ ${#zips[@]} -gt 0 ]; then
+            for z in "${zips[@]}"; do
+              echo "Unzipping $z"
+              unzip -o "$z" -d .
+            done
+          fi
 
-    - name: Install JavaScript Dependencies
-      run: |
-        npm install
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
-    - name: Build Web Assets (Fixed Node Execution)
-      run: |
-        # Run the copy script forcing Node to treat it as a module, then build with vite
-        node --experimental-vm-modules scripts/copy-pdf-worker.js || node -e "require('fs').writeFileSync('package.json', JSON.stringify(Object.assign(JSON.parse(require('fs').readFileSync('package.json')), {type: 'module'}), null, 2))" && npm run build
+      - name: Install dependencies
+        run: npm install
 
-    - name: set up JDK 17
-      uses: actions/setup-java@v4
-      with:
-        java-version: '17'
-        distribution: 'temurin'
+      - name: Fix ESM config for copy-pdf-worker.js
+        run: |
+          node -e "
+            const fs = require('fs');
+            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+            if (pkg.type !== 'module') {
+              pkg.type = 'module';
+              fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+              console.log('Patched package.json with type: module');
+            }
+          "
 
-    - name: Sync Capacitor to Android
-      run: |
-        npx cap sync android
+      - name: Build web assets
+        run: npm run build
 
-    - name: Build Debug APK via Gradle
-      run: |
-        cd android
-        chmod +x gradlew
-        ./gradlew assembleDebug
+      - name: Ensure TypeScript is available for Capacitor CLI
+        run: |
+          if ! npx --no-install tsc -v >/dev/null 2>&1; then
+            echo "TypeScript not found, installing..."
+            npm install --no-save typescript
+          fi
 
-    - name: Upload APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: test-apk
-        path: "android/app/build/outputs/apk/debug/*.apk"
+      - name: Sync Capacitor
+        run: npx cap sync android
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Generate Gradle wrapper (self-contained, no system gradle dependency)
+        run: |
+          cd android
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew missing - bootstrapping Gradle 8.4 to generate wrapper..."
+            curl -fsSL -o /tmp/gradle.zip https://services.gradle.org/distributions/gradle-8.4-bin.zip
+            unzip -q /tmp/gradle.zip -d /tmp/gradle-dist
+            /tmp/gradle-dist/gradle-8.4/bin/gradle wrapper --gradle-version 8.4
+          fi
+          chmod +x gradlew
+
+      - name: Build debug APK
+        run: |
+          cd android
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Find APK
+        id: find_apk
+        run: |
+          APK_PATH=$(find android/app/build/outputs/apk/debug -name "*.apk" | head -n 1)
+          echo "apk_path=$APK_PATH" >> "$GITHUB_OUTPUT"
+
+      - name: Upload APK as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sparple-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          retention-days: 30
+          if-no-files-found: error
