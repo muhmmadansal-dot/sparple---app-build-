@@ -81,6 +81,15 @@ jobs:
           echo "include ':capacitor-cordova-android-plugins'" >> settings.gradle
           echo "project(':capacitor-cordova-android-plugins').projectDir = new File('${{ github.workspace }}/capacitor-cordova-android-plugins')" >> settings.gradle
 
+      - name: Auto-Patch XML Tools Namespace Bug
+        run: |
+          STYLES_FILE="android/app/src/main/res/values/styles.xml"
+          if [ -f "$STYLES_FILE" ]; then
+            echo "Patching styles.xml to bind tools namespace..."
+            # If <resources> tag doesn't contain the tools namespace, add it
+            sed -i 's/<resources>/<resources xmlns:tools="http:\/\/schemas.android.com\/tools">/g' "$STYLES_FILE"
+          fi
+
       - name: Setup JDK 17
         uses: actions/setup-java@v4
         with:
