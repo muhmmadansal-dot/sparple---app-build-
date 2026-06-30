@@ -77,6 +77,7 @@ jobs:
       - name: Build debug APK
         run: |
           cd android
+          sed -i "s|..//capacitor-cordova-android-plugins|../capacitor-cordova-android-plugins|g" settings.gradle 2>/dev/null || true
           ./gradlew assembleDebug --no-daemon
 
       - name: Find APK
